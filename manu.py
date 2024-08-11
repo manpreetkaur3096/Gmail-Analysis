@@ -12,7 +12,6 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
-# Load the OpenAI API key from environment variables
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 
 if OPENAI_API_KEY is None:
@@ -36,13 +35,18 @@ SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 @st.cache_resource
 def authenticate_user():
     creds = None
-    # Always prompt the user to authenticate with their own account
-    flow = InstalledAppFlow.from_client_secrets_file(
-        r'client_secret.json', SCOPES)
-    
-    # Run local server for authentication, this will prompt the user to log in
-    creds = flow.run_local_server(port=8501)
-    
+    if os.path.exists('token.pickle'):
+        with open('token.pickle', 'rb') as token:
+            creds = pickle.load(token)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                r'client_secret.json', SCOPES)
+            creds = flow.run_local_server(port=8501)
+            with open('token.pickle', 'wb') as token:
+                pickle.dump(creds, token)
     return creds
 
 @st.cache_resource
@@ -91,6 +95,7 @@ def generate_word_cloud(emails):
     ).generate(combined_text)
     
     return wordcloud
+
 
 # Updated text summarizer function
 def summarize_email(email_text):
